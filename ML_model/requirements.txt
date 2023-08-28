@@ -1,7 +1,0 @@
-numpy
-#scipy may require openblas-devel, lapack-devel, gcc, g++
-scikit-image
-imageio
-tensorboardX
-pandas
-wandb

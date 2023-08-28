@@ -1,0 +1,3 @@
+[submodule "LovaszSoftmax"]
+	path = LovaszSoftmax
+	url = https://github.com/bermanmaxim/LovaszSoftmax
