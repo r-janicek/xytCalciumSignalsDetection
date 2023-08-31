@@ -176,6 +176,14 @@ def training_step(
     else:
         target = target.long()
 
+    # move criterion weights to gpu
+    if hasattr(criterion, "weight"):
+        if (not criterion.weight.is_cuda):
+            criterion.weight = criterion.weight.to(device)
+    if hasattr(criterion, "NLLLoss"):
+        if (not criterion.NLLLoss.weight.is_cuda):
+            criterion.NLLLoss.weight = criterion.NLLLoss.weight.to(device)
+    # compute loss
     loss = criterion(pred, target)
 
     optimizer.zero_grad(set_to_none=True)
@@ -610,6 +618,14 @@ def get_preds(
             ys_loss = ys_loss.long()[None, :]
             preds_loss = preds_loss[None, :]
 
+        # move criterion weights to cpu
+        if hasattr(criterion, "weight"):
+            if criterion.weight.is_cuda:
+                criterion.weight = criterion.weight.cpu()
+        if hasattr(criterion, "NLLLoss"):
+            if criterion.NLLLoss.weight.is_cuda:
+                criterion.NLLLoss.weight = criterion.NLLLoss.weight.cpu()
+        # compute loss
         loss = criterion(preds_loss, ys_loss).item()
 
         return xs.numpy(), ys.numpy(), preds.numpy(), loss
@@ -787,6 +803,45 @@ def test_function(
 
         # compute exp of predictions
         preds = np.exp(preds)
+
+        # logger.debug(f"preds shape: {preds.shape}")
+        # logger.debug(
+        #     f"sum of preds along dim=0 is close to 1: {np.allclose(preds.sum(axis=0), 1)}")
+        # logger.debug("max and min of sum of preds along dim=0:")
+        # logger.debug(f"{preds.sum(axis=0).max()}, {preds.sum(axis=0).min()}")
+        # logger.debug(
+        #     f"preds[1] and preds[3] are almost the same: {np.allclose(preds[1], preds[3])}")
+        logger.info(
+            f"DEBUG: max and min difference between preds[1] and preds[3]: {np.abs(preds[1]-preds[3]).max()}, {np.abs(preds[1]-preds[3]).min()}")
+        # logger.debug(
+        #     f"max and min values of preds[0]: {preds[0].max()}, {preds[0].min()}")
+        # logger.debug(
+        #     f"max and min values of preds[1]: {preds[1].max()}, {preds[1].min()}")
+        # logger.debug(
+        #     f"max and min values of preds[2]: {preds[2].max()}, {preds[2].min()}")
+        # logger.debug(
+        #     f"max and min values of preds[3]: {preds[3].max()}, {preds[3].min()}")
+
+        # import napari
+
+        # viewer = napari.Viewer()
+        # viewer.add_image(xs)
+        # viewer.add_labels(ys)
+        # viewer.add_image(preds[1],
+        #                  name='sparks',
+        #                  blending='additive',)
+        # viewer.add_image(preds[3],
+        #                  name='puffs',
+        #                  blending='additive',)
+        # viewer.add_image(preds[2],
+        #                  name='waves',
+        #                  blending='additive',)
+        # viewer.add_image(preds[0],
+        #                  name='background',
+        #                  blending='additive',)
+        # napari.run()
+
+        # exit()
 
         # save preds as videos
         write_videos_on_disk(

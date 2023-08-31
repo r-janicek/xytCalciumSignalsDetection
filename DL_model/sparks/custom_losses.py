@@ -143,17 +143,13 @@ def focal_loss(
                 input.device, target.device))
 
     # create mask for ignore_index
-    # print("IGNORE INDEX", ignore_index)
     ignore_mask = torch.where(target == ignore_index, 0, 1)
-    # print("IGNORE MASK\n", ignore_mask, "\n", ignore_mask.shape)
     target_copy = torch.clone(target).detach()  # do not modify original target
     # convert target to torch.int64
     target_copy = target_copy.to(torch.int64)
     temp_ignored_index = 0  # the corresponding pts will be ignored
     target_copy[target_copy == ignore_index] = temp_ignored_index
-    # print("TARGET COPY", target_copy)
     num_ignored = torch.count_nonzero(ignore_mask)
-    # print("NUM IGNORED", num_ignored)
 
     if alpha == None:
         alpha_mask = 1.
@@ -164,7 +160,6 @@ def focal_loss(
         alpha_mask = torch.zeros(target.shape)
         for idx, alpha_t in enumerate(alpha):
             alpha_mask[target == idx] = alpha_t
-        # print(alpha_mask)
 
     alpha_mask = alpha_mask.to(target.device)
 
@@ -176,26 +171,19 @@ def focal_loss(
     target_one_hot: torch.Tensor = one_hot(
         target_copy, num_classes=input.shape[1],
         device=input.device, dtype=input.dtype)
-    # print("TARGET ONE HOT", target_one_hot, target_one_hot.shape)
 
     # compute the actual focal loss
     weight = torch.pow(-input_soft + 1., gamma)
     focal = - weight * torch.log(input_soft)
-    # print("ALPHA MASK", alpha_mask)
-    # print("FOCAL", focal)
     loss_tmp = torch.sum(target_one_hot * focal, dim=1)
-    # print("LOSS TMP SHAPE", loss_tmp.shape)
     # remove loss values in ignored points
     loss_tmp = loss_tmp * ignore_mask * alpha_mask
-    # print("LOSS TMP SHAPE", loss_tmp.shape)
-    # print("LOSS TMP", loss_tmp)
 
     if reduction == 'none':
         loss = loss_tmp
     elif reduction == 'mean':
         # loss_old = torch.mean(loss_tmp)
         loss = torch.sum(loss_tmp)/num_ignored
-        # print(loss, loss_old)
     elif reduction == 'sum':
         loss = torch.sum(loss_tmp)
     else:
@@ -636,3 +624,110 @@ class mySoftDiceLoss(SoftDiceLoss):
 
     def forward(self, x, y, loss_mask=None):
         return 1 + super().forward(x, y, loss_mask)
+
+
+################################## DICE + CE LOSS #############################
+
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 24 16:39:03 2020
+
+@author: Negin
+(modified Negin's code to work with 3D data)
+"""
+
+
+class Dice_CELoss(nn.Module):
+    def __init__(self, weight, ignore_index=0,
+                 #  ignore_first=True,  apply_softmax=True
+                 ):
+        super(Dice_CELoss, self).__init__()
+        self.eps = 1
+        # self.ignore_first = ignore_first
+        # self.apply_softmax = apply_softmax
+        # self.CE = nn.CrossEntropyLoss()
+        self.ignore_index = ignore_index
+        self.NLLLoss = nn.NLLLoss(
+            ignore_index=self.ignore_index,
+            weight=weight  # .to(device, non_blocking=True)
+        )
+
+    def forward(self, input, target):
+
+        # CE_loss = self.CE(input, target)
+        CE_loss = self.NLLLoss(input, target)
+
+        # if self.apply_softmax:
+        #     input = input.softmax(dim=1)
+
+        # UNet's last layer is a log_softmax layer
+        input = input.exp()
+
+        # remove ignored ROIs from input
+        # for all 4 classes in the input, set values where target == ignore_index to 0
+        input_clean = torch.zeros_like(input)
+        for i in range(input.shape[1]):
+            input_clean[:, i] = torch.where(
+                target == self.ignore_index, 0, input[:, i])
+
+        # remove ignored ROIs from target
+        target_clean = torch.where(
+            target == self.ignore_index, 0, target)
+
+        target_one_hot = F.one_hot(
+            target_clean.long(),
+            num_classes=input_clean.shape[1]
+        ).permute(0, 4, 1, 2, 3)
+
+        # ignoring background -> necessary because of ignored ROIs
+        input_clean = input_clean[:, 1:]
+        target_one_hot = target_one_hot[:, 1:]
+
+        intersection = torch.sum(target_one_hot*input_clean, dim=(2, 3, 4))
+        cardinality = torch.sum(target_one_hot+input_clean, dim=(2, 3, 4))
+
+        dice = (2*intersection+self.eps)/(cardinality+self.eps)
+
+        dice = torch.mean(torch.sum(dice, dim=1)/input_clean.size(dim=1))
+        # input.size(dim=1) is the number of classes
+
+        loss = 0.8*CE_loss-0.2*torch.log(dice)
+        return loss
+
+
+''' original version
+
+class Dice_CELoss(nn.Module):
+    def __init__(self, ignore_first=True, apply_softmax=True):
+        super(Dice_CELoss, self).__init__()
+        self.eps = 1
+        self.ignore_first = ignore_first
+        self.apply_softmax = apply_softmax
+        self.CE = nn.CrossEntropyLoss()
+
+    def forward(self, input, target):
+
+        CE_loss = self.CE(input, target)
+
+        if self.apply_softmax:
+            input = input.softmax(dim=1)
+
+        target_one_hot = F.one_hot(target.long(), num_classes=input.shape[1]).permute(0,3,1,2)
+
+        if self.ignore_first:
+            input = input[:, 1:]
+            target_one_hot = target_one_hot[:, 1:]
+
+
+        intersection= torch.sum(target_one_hot*input,dim=(2,3))
+        cardinality= torch.sum(target_one_hot+input,dim=(2,3))
+
+         
+        dice=(2*intersection+self.eps)/(cardinality+self.eps)
+
+        dice = torch.mean(torch.sum(dice, dim=1)/input.size(dim=1))
+
+        loss = 0.8*CE_loss-0.2*torch.log(dice)
+        return loss
+
+'''

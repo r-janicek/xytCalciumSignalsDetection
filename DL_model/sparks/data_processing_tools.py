@@ -1093,7 +1093,8 @@ def process_spark_prediction(
 
 
 def simple_nonmaxima_suppression(
-    img, maxima_mask=None, min_dist=None, return_mask=False, threshold=0.5, sigma=2
+    img, maxima_mask=None, min_dist=None, return_mask=False,
+    threshold=0.5, sigma=2
 ):
     """
     Extract local maxima from input array (t,x,y).

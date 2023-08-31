@@ -54,9 +54,9 @@ if __name__ == "__main__":
 
     ############################ init random seeds #############################
 
-    torch.manual_seed(0)
-    random.seed(0)
-    np.random.seed(0)
+    # torch.manual_seed(0) <--------------------------------------------------!
+    # random.seed(0) <--------------------------------------------------------!
+    # np.random.seed(0) <-----------------------------------------------------!
 
     ############################ configure datasets ############################
 
@@ -261,3 +261,8 @@ if __name__ == "__main__":
     if c.getboolean("general", "testing", fallback=False):  # Run final validation
         logger.info("Starting final validation")
         trainer.run_validation(wandb_log=wandb_log)
+
+
+# # shutdown computer after training
+# import subprocess
+# subprocess.run(["shutdown", "-s"])

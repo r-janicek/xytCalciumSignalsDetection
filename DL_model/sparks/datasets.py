@@ -203,13 +203,12 @@ class SparkDataset(Dataset):
                 video) for video in self.data]
 
         if smoothing == '2d':
-            _smooth_filter = torch.as_tensor(([1/16, 1/16, 1/16],
-                                              [1/16, 1/2, 1/16],
-                                              [1/16, 1/16, 1/16]))
-            self.data = [torch.from_numpy([convolve2d(frame, _smooth_filter,
-                                                      mode='same', boundary='symm')
-                                           for frame in video])
-                         for video in self.data]
+            logger.info("Applying 2d gaussian blur to videos...")
+            # apply gaussian blur to each frame of each video in self.data
+            from torchvision.transforms import GaussianBlur
+            gaussian_blur = GaussianBlur(kernel_size=(3, 3), sigma=1.0)
+            self.data = [gaussian_blur(video) for video in self.data]
+
         if smoothing == '3d':
             _smooth_filter = 1/52*torch.ones((3, 3, 3))
             _smooth_filter[1, 1, 1] = 1/2

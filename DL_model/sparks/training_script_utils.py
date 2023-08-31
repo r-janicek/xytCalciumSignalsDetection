@@ -6,7 +6,8 @@ from custom_losses import (
     LovaszSoftmax3d,
     SumFocalLovasz,
     mySoftDiceLoss,
-    LovaszSoftmax
+    LovaszSoftmax,
+    Dice_CELoss
 )
 from architectures import TempRedUNet, UNetConvLSTM
 import unet_openai
@@ -420,7 +421,10 @@ def init_criterion(params, dataset, ignore_index, device):
     # initialize loss function
 
     # class weights
-    if params["criterion"] in ["nll_loss", "focal_loss", "sum_losses"]:
+    if params["criterion"] in ["nll_loss",
+                               "focal_loss",
+                               "sum_losses",
+                               "dice_nll_loss"]:
         class_weights = compute_class_weights(dataset)
         logger.info(
             "Using class weights: {}".format(
@@ -430,8 +434,8 @@ def init_criterion(params, dataset, ignore_index, device):
 
     if params["criterion"] == "nll_loss":
         criterion = nn.NLLLoss(
-            ignore_index=ignore_index, weight=class_weights.to(
-                device, non_blocking=True)
+            ignore_index=ignore_index, weight=class_weights  # .to(
+            # device, non_blocking=True)
         )
     elif params["criterion"] == "focal_loss":
         criterion = FocalLoss(
@@ -465,6 +469,12 @@ def init_criterion(params, dataset, ignore_index, device):
         criterion = mySoftDiceLoss(apply_nonlin=softmax,
                                    batch_dice=True,
                                    do_bg=False)
+
+    elif params["criterion"] == "dice_nll_loss":
+        criterion = Dice_CELoss(
+            ignore_index=ignore_index,
+            weight=class_weights,
+        )
 
     else:
         logger.error(

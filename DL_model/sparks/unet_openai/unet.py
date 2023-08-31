@@ -105,8 +105,8 @@ class Upsample(nn.Module):
         assert x.shape[1] == self.channels
         if self.dims == 3:
             x = F.interpolate(
-                x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
-                # x, (x.shape[2] * 2, x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
+                # x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
+                x, (x.shape[2] * 2, x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
                 # if changing the stride in downsample
             )
         else:
@@ -132,8 +132,8 @@ class Downsample(nn.Module):
         self.out_channels = out_channels or channels
         self.use_conv = use_conv
         self.dims = dims
-        stride = 2 if dims != 3 else (1, 2, 2)
-        # stride = 2
+        # stride = 2 if dims != 3 else (1, 2, 2)
+        stride = 2
         if use_conv:
             self.op = conv_nd(
                 dims, self.channels, self.out_channels, 3, stride=stride, padding=1
@@ -598,6 +598,9 @@ class UNetModel(nn.Module):
             zero_module(conv_nd(dims, input_ch, out_channels, 3, padding=1)),
         )
 
+        # make the network a classifier
+        self.logsoftmax = nn.LogSoftmax(dim=1)
+
     # def convert_to_fp16(self):
     #     """
     #     Convert the torso of the model to float16.
@@ -642,4 +645,8 @@ class UNetModel(nn.Module):
             h = module(h)
             # logger.info(f"after output block shape: {h.shape}")
         h = h.type(x.dtype)
-        return self.out(h)
+        h = self.out(h)
+
+        # make network a classifier
+        h = self.logsoftmax(h)
+        return h
