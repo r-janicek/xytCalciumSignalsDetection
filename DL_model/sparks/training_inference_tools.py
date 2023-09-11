@@ -385,7 +385,11 @@ def do_inference(
                                          test_dataset.duration
                                          )
 
-    for x, y in test_dataloader:
+    for x in test_dataloader:
+
+        # if gt is available, x is a tuple (x, y)
+        if test_dataset.gt_available:
+            x, y = x
 
         if detect_nan:
             detect_nan_sample(x, y)
@@ -511,13 +515,12 @@ def get_preds(
     if inference_types is None:
         assert test_dataset.inference in ['overlap', 'average', 'gaussian', 'max'], \
             f"inference type '{i}' not implemented yet"
+        inference_types = [test_dataset.inference]
+
     else:
         for i in inference_types:
             assert i in ['overlap', 'average', 'gaussian', 'max'], \
                 f"inference type '{i}' not implemented yet"
-
-    if inference_types is None:
-        inference_types = [test_dataset.inference]
 
     # create a dataloader if not provided
     if test_dataloader is None:
@@ -548,7 +551,8 @@ def get_preds(
 
     # get original movie xs and annotations ys
     xs = test_dataset.data[0]
-    ys = test_dataset.annotations[0]
+    if test_dataset.gt_available:
+        ys = test_dataset.annotations[0]
 
     # remove padded frames
     if test_dataset.pad != 0:
@@ -561,12 +565,15 @@ def get_preds(
             start_pad = start_pad // test_dataset.num_channels
             end_pad = end_pad // test_dataset.num_channels
 
-        if ys.ndim == 3:
-            ys = ys[start_pad:end_pad]
+        if type(test_dataset).__name__ != 'SparkDatasetLSTM':
+            if test_dataset.gt_available:
+                ys = ys[start_pad:end_pad]
             if len(inference_types) == 1:
                 preds = preds[:, start_pad:end_pad]
             else:
                 preds = {i: p[:, start_pad:end_pad] for i, p in preds.items()}
+        else:
+            raise NotImplementedError
 
     # If original sample was shorter than current movie duration, remove
     # additional padded frames
@@ -581,13 +588,17 @@ def get_preds(
             start_pad = start_pad // test_dataset.num_channels
             end_pad = end_pad // test_dataset.num_channels
 
-        ys = ys[start_pad:end_pad]
+        if test_dataset.gt_available:
+            ys = ys[start_pad:end_pad]
         if len(inference_types) == 1:
             preds = preds[:, start_pad:end_pad]
         else:
             preds = {i: p[:, start_pad:end_pad] for i, p in preds.items()}
 
     if compute_loss:  # Compute loss
+        assert test_dataset.gt_available, \
+            "cannot compute loss if annotations are not available"
+
         # ys is torch.ByteTensor
         # ys = ys[None]  # .to(device, non_blocking=True)
 
@@ -636,7 +647,10 @@ def get_preds(
         else:
             preds = {i: p.numpy() for i, p in preds.items()}
 
+    if test_dataset.gt_available:
         return xs.numpy(), ys.numpy(), preds
+    else:
+        return xs.numpy(), preds
 
 
 def run_samples_in_model(network, device, datasets):

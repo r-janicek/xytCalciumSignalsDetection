@@ -889,18 +889,19 @@ def get_processed_result(
     return preds_instances, preds_segmentation, sparks_loc
 
 
-def dict_to_int_mask(preds_dict):
+def preds_dict_to_mask(preds_dict):
     """
     Convert a dict of binary masks representing a class of calcium release events
     to a single mask with values in {0,1,2,3,4}.
 
     preds_dict: dict with binary masks for each class sparks, puffs, waves, ignore
     """
-    int_mask = np.zeros_like(list(preds_dict.values())[0], dtype=int)
+    preds_mask = np.zeros_like(list(preds_dict.values())[0], dtype=int)
     for event_type in preds_dict.keys():
-        int_mask = np.where(
-            preds_dict[event_type], class_to_nb(event_type), int_mask)
-    return int_mask
+        preds_mask = np.where(
+            preds_dict[event_type], class_to_nb(event_type), preds_mask)
+    return preds_mask
+
 
 ########################### Sparks' masks processing ###########################
 

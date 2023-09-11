@@ -44,11 +44,11 @@ MIN_DIST_T = round(20 / TIME_FRAME)  # min distance in time between sparks
 #################################### Napari ####################################
 
 
-def get_discrete_cmap(name='viridis', lut=16):
+def get_discrete_cmap(name='gray', lut=16):
     # function to obtain discrete Colormap instance that can be used by Napari
 
     # create original cmap
-    segmented_cmap = cm.get_cmap(name=name, lut=16)
+    segmented_cmap = cm.get_cmap(name=name, lut=lut)
 
     # get colors
     colors = segmented_cmap(np.arange(0, segmented_cmap.N))

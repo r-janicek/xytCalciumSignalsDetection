@@ -3,7 +3,9 @@ Classes to create training and testing datasets
 '''
 
 import logging
+import ntpath
 import os
+import imageio
 
 import numpy as np
 import torch
@@ -75,6 +77,8 @@ class SparkDataset(Dataset):
                             chunks (TODO: define best average method).
         '''
 
+        ### set class attributes ###
+
         # base_path is the folder containing the whole dataset (train and test)
         self.base_path = base_path
 
@@ -86,9 +90,13 @@ class SparkDataset(Dataset):
         self.min_dist_t = round(20 / self.time_frame)  # min distance in time
 
         # dataset parameters
+        self.sample_ids = sample_ids
         self.testing = testing
         self.inference = inference
         self.gt_available = gt_available
+        self.smoothing = smoothing
+        self.resampling = resampling
+        self.resampling_rate = resampling_rate
         self.sample_ids = sample_ids
         self.only_sparks = only_sparks
         self.sparks_type = sparks_type
@@ -121,14 +129,14 @@ class SparkDataset(Dataset):
         self.normalize_video = normalize_video
         self.remove_background = remove_background
 
-        # get video samples
-        self.data = list(load_movies_ids(data_folder=self.base_path,
-                                         ids=sample_ids,
-                                         names_available=True,
-                                         movie_names="video"
-                                         ).values())
+        ### get video samples and ground truth ###
+
+        self.data = self.get_data()
         self.data = [torch.from_numpy(movie.astype('int'))
                      for movie in self.data]  # int32
+
+        if self.gt_available:
+            self.annotations = self.get_ground_truth()
 
         if inference is not None:
             # need to keep track of movie duration, in case it is shorter than
@@ -142,83 +150,47 @@ class SparkDataset(Dataset):
                 f"Dataset set to testing mode, but it contains "\
                 f"{len(sample_ids)} samples: {sample_ids}."
 
-        # get annotation masks, if ground truth is available
-        if self.gt_available:
-            # preprocess annotations if necessary
-            assert self.sparks_type in ['peaks', 'small', 'raw'], \
-                "Sparks type should be 'peaks', 'small' or 'raw'."
+        # preprocess videos if necessary
+        self.preprocess_videos()
 
-            if self.sparks_type == 'raw':
-                # get class label masks
-                self.annotations = list(load_annotations_ids(
-                    data_folder=self.base_path,
-                    ids=sample_ids,
-                    mask_names="class_label"
-                ).values())
-                # no preprocessing
+        # adjust videos shape so that it is suitable for the model
+        self.adjust_videos_shape()
 
-            elif self.sparks_type == 'peaks':
-                # TODO: if necessary implement mask that contain only spark peaks
-                pass
+        # compute chunks indices
+        self.lengths, self.tot_blocks, self.preceding_blocks = self.compute_chunks_indices()
 
-            elif self.sparks_type == 'small':
-                # reduce the size of sparks annotations and replace difference
-                # with undefined label (4)
+    ############################## class methods ###############################
 
-                self.annotations = list(load_annotations_ids(
-                    data_folder=self.base_path,
-                    ids=sample_ids,
-                    mask_names="class_label_small_sparks"
-                ).values())
+    def get_data(self):
+        return list(load_movies_ids(data_folder=self.base_path,
+                                    ids=self.sample_ids,
+                                    names_available=True,
+                                    movie_names="video"
+                                    ).values())
 
-            self.annotations = [torch.from_numpy(mask)
-                                for mask in self.annotations]  # int8
-
-            # if testing, load the event label masks too (for peaks detection)
-            # and compute the location of the spark peaks
-
-            if self.testing:
-                # if testing, the dataset contain a single video
-
-                self.events = list(load_annotations_ids(
-                    data_folder=self.base_path,
-                    ids=sample_ids,
-                    mask_names="event_label"
-                ).values())[0]
-                self.events = torch.from_numpy(self.events)  # int8
-
-                logger.debug("Computing spark peaks...")
-                spark_mask = np.where(self.annotations[0] == 1,
-                                      self.events, 0)
-                self.coords_true = detect_spark_peaks(movie=self.data[0],
-                                                      spark_mask=spark_mask,
-                                                      sigma=2,
-                                                      max_filter_size=10)
-                logger.debug(
-                    f"Sample {self.video_name} contains {len(self.coords_true)} sparks.")
-
+    def preprocess_videos(self):
         # preprocess videos if necessary
         if self.remove_background == 'average':
             self.data = [self.remove_avg_background(
                 video) for video in self.data]
 
-        if smoothing == '2d':
+        if self.smoothing == '2d':
             logger.info("Applying 2d gaussian blur to videos...")
             # apply gaussian blur to each frame of each video in self.data
             from torchvision.transforms import GaussianBlur
             gaussian_blur = GaussianBlur(kernel_size=(3, 3), sigma=1.0)
             self.data = [gaussian_blur(video) for video in self.data]
 
-        if smoothing == '3d':
+        elif self.smoothing == '3d':
             _smooth_filter = 1/52*torch.ones((3, 3, 3))
             _smooth_filter[1, 1, 1] = 1/2
             self.data = [convolve(video, _smooth_filter)
                          for video in self.data]
 
-        if resampling:
+        if self.resampling:
             self.fps = [self.get_fps(file) for file in self.files]
             self.data = [self.video_spline_interpolation(video, video_path,
-                                                         resampling_rate)
+                                                         self.resampling_rate)
                          for video, video_path in zip(self.data, self.files)]
 
         if self.normalize_video == 'movie':
@@ -229,36 +201,23 @@ class SparkDataset(Dataset):
             self.data = [(video-video.min())/(absolute_max-video.min())
                          for video in self.data]
 
+    def adjust_videos_shape(self):
+        # adjust video shape so that it is suitable for the model
+
         # pad movies shorter than chunk duration with zeros before beginning and
         # after end
         self.data = [self.pad_short_video(video) for video in self.data]
         if self.gt_available:
             self.annotations = [self.pad_short_video(mask,
-                                padding_value=ignore_index)
+                                padding_value=self.ignore_index)
                                 for mask in self.annotations]
 
         # pad movies whose length does not match chunks_duration and step params
         self.data = [self.pad_end_of_video(video) for video in self.data]
         if self.gt_available:
             self.annotations = [self.pad_end_of_video(mask,
-                                mask=True, padding_value=ignore_index)
+                                mask=True, padding_value=self.ignore_index)
                                 for mask in self.annotations]
-
-        # compute chunks indices
-        self.lengths, self.tot_blocks, self.preceding_blocks = self.compute_chunks_indices()
-
-        # if using temporal reduction, shorten the annotations duration
-        if self.temporal_reduction and self.gt_available:
-            self.annotations = [self.shrink_mask(mask)
-                                for mask in self.annotations]
-
-        # print("annotations shape", self.annotations[-1].shape)
-
-        # if training with sparks only, set puffs and waves to 0
-        if self.only_sparks and self.gt_available:
-            logger.info("Removing puff and wave annotations in training set")
-            self.annotations = [torch.where(torch.logical_or(mask == 1, mask == 4),
-                                            mask, 0) for mask in self.annotations]
 
     def pad_short_video(self, video, padding_value=0):
         # pad videos shorter than chunk duration with zeros on both sides
@@ -297,6 +256,75 @@ class SparkDataset(Dataset):
                 self.step) % 1 == 0, "padding at end of video is wrong"
 
         return video
+
+    def get_ground_truth(self):
+        # preprocess annotations if necessary
+        assert self.sparks_type in ['peaks', 'small', 'raw'], \
+            "Sparks type should be 'peaks', 'small' or 'raw'."
+
+        if self.sparks_type == 'raw':
+            # get class label masks
+            annotations = list(load_annotations_ids(
+                data_folder=self.base_path,
+                ids=self.sample_ids,
+                mask_names="class_label"
+            ).values())
+            # no preprocessing
+
+        elif self.sparks_type == 'peaks':
+            # TODO: if necessary implement mask that contain only spark peaks
+            pass
+
+        elif self.sparks_type == 'small':
+            # reduce the size of sparks annotations and replace difference
+            # with undefined label (4)
+
+            annotations = list(load_annotations_ids(
+                data_folder=self.base_path,
+                ids=self.sample_ids,
+                mask_names="class_label_small_sparks"
+            ).values())
+
+        annotations = [torch.from_numpy(mask)
+                       for mask in annotations]  # int8
+
+        # if testing, load the event label masks too (for peaks detection)
+        # and compute the location of the spark peaks
+
+        if self.testing:
+            # if testing, the dataset contain a single video
+
+            self.events = list(load_annotations_ids(
+                data_folder=self.base_path,
+                ids=self.sample_ids,
+                mask_names="event_label"
+            ).values())[0]
+            self.events = torch.from_numpy(self.events)  # int8
+
+            logger.debug("Computing spark peaks...")
+            spark_mask = np.where(annotations[0] == 1,
+                                  self.events, 0)
+            self.coords_true = detect_spark_peaks(movie=self.data[0],
+                                                  spark_mask=spark_mask,
+                                                  sigma=2,
+                                                  max_filter_size=10)
+            logger.debug(
+                f"Sample {self.video_name} contains {len(self.coords_true)} sparks.")
+
+        # if using temporal reduction, shorten the annotations duration
+        if self.temporal_reduction and self.gt_available:
+            self.annotations = [self.shrink_mask(mask)
+                                for mask in self.annotations]
+
+        # print("annotations shape", self.annotations[-1].shape)
+
+        # if training with sparks only, set puffs and waves to 0
+        if self.only_sparks and self.gt_available:
+            logger.info("Removing puff and wave annotations in training set")
+            annotations = [torch.where(torch.logical_or(mask == 1, mask == 4),
+                                       mask, 0) for mask in annotations]
+
+        return annotations
 
     def compute_chunks_indices(self):
         lengths = [video.shape[0] for video in self.data]
@@ -461,6 +489,47 @@ class SparkDataset(Dataset):
             return 3
         else:
             return np.max(voxel_seq)
+
+
+# define dataset same as SparkDataset, but load sample from a path
+
+class SparkDatasetPath(SparkDataset):
+    '''
+    SparkDataset class for UNet-convLSTM model.
+
+    The dataset is adapted in such a way that each chunk is a sequence of
+    frames centered around the frame to be predicted.
+    The label is the segmentation mask of the central frame.
+    '''
+
+    def __init__(self, sample_path,
+                 step=4, duration=16, smoothing=False,
+                 resampling=False, resampling_rate=150,
+                 remove_background='average', temporal_reduction=False,
+                 num_channels=1, normalize_video='chunk',
+                 only_sparks=False, sparks_type='peaks', ignore_index=4,
+                 ignore_frames=0):
+
+        self.sample_path = sample_path
+
+        # get video name from path
+        sample_name = ntpath.basename(sample_path).split('.')[0]
+
+        # initialize parent class
+        super().__init__(
+            base_path=None, sample_ids=[sample_name],
+            testing=False, step=step, duration=duration,
+            smoothing=smoothing, resampling=resampling,
+            resampling_rate=resampling_rate, remove_background=remove_background,
+            temporal_reduction=temporal_reduction, num_channels=num_channels,
+            normalize_video=normalize_video, only_sparks=only_sparks,
+            sparks_type=sparks_type, ignore_index=ignore_index,
+            ignore_frames=ignore_frames, gt_available=False,
+            inference='overlap'  # can change this if necessary
+        )
+
+    def get_data(self):
+        return [np.asarray(imageio.volread(self.sample_path))]
 
 
 # define dataset class that will be used for training the UNet-convLSTM model

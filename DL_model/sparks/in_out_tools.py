@@ -273,7 +273,10 @@ def write_videos_on_disk(
     preds : all u-net preds [bg preds, sparks preds, puffs preds, waves preds]
             preds should already be normalized between 0 and 1
     """
-    out_name_root = training_name + "_" + video_name + "_"
+    if out_name_root is not None:
+        out_name_root = training_name + "_" + video_name + "_"
+    else:
+        out_name_root = video_name + "_"
 
     logger.debug(f"Writing videos on directory {os.path.abspath(path)} ..")
     os.makedirs(os.path.abspath(path), exist_ok=True)
