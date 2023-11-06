@@ -19,18 +19,18 @@ from typing import List, Union
 
 from torch import nn
 
-import models.UNet as unet
-import models.unetOpenAI as unet_openai
-from config import TrainingConfig, config
-from data.datasets import (
+import DL_model.models.UNet as unet
+import DL_model.models.unetOpenAI as unet_openai
+from DL_model.config import TrainingConfig, config
+from DL_model.data.datasets import (
     SparkDataset,
     SparkDatasetLSTM,
     SparkDatasetResampled,
     SparkDatasetTemporalReduction,
 )
-from models.architectures import TempRedUNet, UNetConvLSTM, UNetPadWrapper
-from models.new_unet import UNet
-from utils.custom_losses import (
+from DL_model.models.architectures import TempRedUNet, UNetConvLSTM, UNetPadWrapper
+from DL_model.models.new_unet import UNet
+from DL_model.utils.custom_losses import (
     Dice_CELoss,
     FocalLoss,
     LovaszSoftmax,
@@ -38,7 +38,7 @@ from utils.custom_losses import (
     MySoftDiceLoss,
     SumFocalLovasz,
 )
-from utils.training_inference_tools import (
+from DL_model.utils.training_inference_tools import (
     TransformedSparkDataset,
     compute_class_weights,
     random_flip,

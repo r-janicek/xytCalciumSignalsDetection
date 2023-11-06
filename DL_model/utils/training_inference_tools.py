@@ -21,24 +21,24 @@ from torch import nn
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader
 
-from config import TrainingConfig, config
-from data.data_processing_tools import (
+from DL_model.config import TrainingConfig, config
+from DL_model.data.data_processing_tools import (
     masks_to_instances_dict,
     preds_dict_to_mask,
     process_raw_predictions,
     remove_padding,
 )
-from data.datasets import SparkDataset, SparkDatasetInference
-from evaluation.metrics_tools import (
+from DL_model.data.datasets import SparkDataset, SparkDatasetInference
+from DL_model.evaluation.metrics_tools import (
     compute_iou,
     get_matches_summary,
     get_metrics_from_summary,
     get_score_matrix,
 )
-from models.UNet import unet
-from models.UNet.unet.trainer import _write_results
-from utils.custom_losses import MySoftDiceLoss
-from utils.in_out_tools import write_videos_on_disk
+from DL_model.models.UNet import unet
+from DL_model.models.UNet.unet.trainer import _write_results
+from DL_model.utils.custom_losses import MySoftDiceLoss
+from DL_model.utils.in_out_tools import write_videos_on_disk
 
 __all__ = [
     "MyTrainingManager",  # training

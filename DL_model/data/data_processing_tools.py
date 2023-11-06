@@ -32,7 +32,7 @@ from skimage.measure import label, regionprops
 from skimage.morphology import binary_closing, disk
 from skimage.segmentation import watershed
 
-from config import config
+from DL_model.config import config
 
 logger = logging.getLogger(__name__)
 

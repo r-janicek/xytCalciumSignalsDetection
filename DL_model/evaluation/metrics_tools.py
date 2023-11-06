@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from config import config
+from DL_model.config import config
 
 logger = logging.getLogger(__name__)
 
