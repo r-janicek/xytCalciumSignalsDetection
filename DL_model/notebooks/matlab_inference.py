@@ -26,6 +26,9 @@ config_path = os.path.join("config_files", "config_final_model.ini")
 params = TrainingConfig(training_config_file=config_path)
 params.run_name = "final_model"
 model_filename = f"network_100000.pth"
+# add parameters to filter detected events
+print("add parameters to filter detected events, size, duration etc")
+
 
 ### Configure UNet ###
 # params.set_device(device="auto")
