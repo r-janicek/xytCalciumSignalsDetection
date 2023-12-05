@@ -1,0 +1,39 @@
+name: xytCaSignals
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - dataclasses
+  - h5py
+  - hdf5
+  - imageio
+  - importlib-metadata
+  - libtiff
+  - markdown
+  - matplotlib-base
+  - numpy
+  - pandas
+  - pathtools
+  - pillow
+  - pip
+  - python=3.10
+  - pytorch
+  - scikit-image
+  - scikit-learn
+  - scipy
+  - setuptools
+  - tensorboardx
+  - tensorflow
+  - tensorflow-base
+  - tensorflow-estimator
+  - tifffile
+  - tk
+  - toolz
+  - torchaudio
+  - torchvision
+  - tornado
+  - urllib3
+  - wandb
+  - pip:
+    - connected-components-3d

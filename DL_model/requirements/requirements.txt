@@ -1,0 +1,11 @@
+torch==1.8.1
+matplotlib==3.3.4
+numpy==1.20.3
+imageio==2.9.0
+scikit_image==0.18.1
+pandas==1.2.3
+scipy==1.6.2
+Pillow==8.3.1
+scikit_learn==0.24.2
+skimage==0.0
+tensorboardX==2.4
