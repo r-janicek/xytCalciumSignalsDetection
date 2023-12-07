@@ -24,8 +24,9 @@ from DL_model.utils.visualization_tools import (
 # Initialize training-specific parameters
 config_path = os.path.join("config_files", "config_final_model.ini")
 params = TrainingConfig(training_config_file=config_path)
-params.run_name = "final_model"
-model_filename = f"network_100000.pth"
+
+#params.run_name = "final_model"
+#model_filename = f"network_100000.pth"
 # add parameters to filter detected events
 print("add parameters to filter detected events, size, duration etc")
 
@@ -44,10 +45,10 @@ if params.device.type != "cpu":
 ### Load UNet model ###
 
 # Path to the saved model checkpoint
-models_relative_path = os.path.join(
-    "models", "saved_models", params.run_name, model_filename
-)
-model_dir = os.path.realpath(os.path.join(config.basedir, models_relative_path))
+#models_relative_path = os.path.join(
+#    "models", "saved_models", params.run_name, model_filename
+#)
+# model_dir = os.path.realpath(os.path.join(config.basedir, models_relative_path))
 
 # Load the model state dictionary
 try:
