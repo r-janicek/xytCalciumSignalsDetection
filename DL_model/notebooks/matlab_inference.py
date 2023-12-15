@@ -1,6 +1,15 @@
 # To import modules from parent directory in Jupyter Notebook
 import sys
-sys.path.append("..")
+import os
+
+# where the this file is present.
+#current = os.path.dirname(os.path.realpath(__file__))
+# Getting the parent directory name
+# where the current directory is present.
+#parent = os.path.dirname(current)
+# adding the parent directory to
+# the sys.path.
+#sys.path.append(parent_dir)
 
 import os
 
