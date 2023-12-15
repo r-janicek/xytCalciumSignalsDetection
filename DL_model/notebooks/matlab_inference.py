@@ -8,7 +8,7 @@ import imageio
 import numpy as np
 import torch
 from torch import nn
-
+print("555")
 from DL_model.config import TrainingConfig, config
 
 from DL_model.utils.training_inference_tools import get_final_preds
@@ -20,7 +20,6 @@ from DL_model.utils.visualization_tools import (
 )
 
 ### Set training-specific parameters ###
-
 # Initialize training-specific parameters
 config_path = os.path.join("config_files", "config_final_model.ini")
 params = TrainingConfig(training_config_file=config_path)
@@ -70,7 +69,6 @@ except RuntimeError as e:
     else:
         # Handle other exceptions or re-raise the exception if it's unrelated
         raise
-
 
 network.eval()
 segmentation, instances = get_final_preds(
