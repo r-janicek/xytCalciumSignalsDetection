@@ -1,23 +1,22 @@
 # To import modules from parent directory in Jupyter Notebook
 import sys
 import os
-
+print("Number of arguments:", len(sys.argv), "arguments")
+print("Argument List:", str(sys.argv))
 # where the this file is present.
-#current = os.path.dirname(os.path.realpath(__file__))
+current = os.path.dirname(os.path.realpath(__file__))
 # Getting the parent directory name
 # where the current directory is present.
-#parent = os.path.dirname(current)
+parent = os.path.dirname(current)
+print("Parent directory: ", parent)
 # adding the parent directory to
 # the sys.path.
-#sys.path.append(parent_dir)
-
-import os
+sys.path.append(parent)
 
 import imageio
 import numpy as np
 import torch
 from torch import nn
-print("555")
 from DL_model.config import TrainingConfig, config
 
 from DL_model.utils.training_inference_tools import get_final_preds
@@ -60,7 +59,7 @@ if params.device.type != "cpu":
 
 # Load the model state dictionary
 try:
-    network.load_state_dict(torch.load(model_dir, map_location=params.device))
+    network.load_state_dict(torch.load(sys.argv[1], map_location=params.device))
 except RuntimeError as e:
     if "module" in str(e):
         # The error message contains "module," so handle the DataParallel loading
@@ -71,7 +70,7 @@ except RuntimeError as e:
         temp_device = next(iter(network.parameters())).device
 
         network = nn.DataParallel(network)
-        network.load_state_dict(torch.load(model_dir, map_location=params.device))
+        network.load_state_dict(torch.load(sys.argv[1], map_location=params.device))
 
         print("Network should be on CPU, removing DataParallel wrapper...")
         network = network.module.to(temp_device)
@@ -83,6 +82,19 @@ network.eval()
 segmentation, instances = get_final_preds(
     model=network,
     params=params,
-    movie=movie_matrix,
+    movie_path=sys.argv[2],
 )
 
+# Get the movie filename
+movie_filename = os.path.splitext(os.path.basename(sys.argv[2]))[0]
+movie_dirname = os.path.dirname(sys.argv[2])
+
+# Save the segmentation and instances on disk as .tif files
+imageio.volwrite(
+    os.path.join(movie_dirname, f"{movie_filename}_unet_segmentation.tif"),
+    np.uint8(segmentation),
+)
+imageio.volwrite(
+    os.path.join(movie_dirname, f"{movie_filename}_unet_instances.tif"), np.uint8(
+        instances)
+)
