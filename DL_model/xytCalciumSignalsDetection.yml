@@ -30,6 +30,7 @@ dependencies:
   - torchvision
   - tornado
   - urllib3
+  - vispy
   - wandb
   - pip:
     - connected-components-3d
