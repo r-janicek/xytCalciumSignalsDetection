@@ -20,9 +20,9 @@ from torch import nn
 from torch.utils.data import Dataset
 from torchvision.transforms import GaussianBlur
 
-from DL_model.config import TrainingConfig, config
-from DL_model.data.data_processing_tools import detect_spark_peaks, remove_padding
-from DL_model.utils.in_out_tools import load_annotations_ids, load_movies_ids
+from config import TrainingConfig, config
+from data.data_processing_tools import detect_spark_peaks, remove_padding
+from utils.in_out_tools import load_annotations_ids, load_movies_ids
 
 __all__ = [
     "SparkDataset",

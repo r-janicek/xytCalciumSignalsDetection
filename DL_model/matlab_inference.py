@@ -1,27 +1,28 @@
 # To import modules from parent directory in Jupyter Notebook
 import sys
 import os
-print("Number of arguments:", len(sys.argv), "arguments")
-print("Argument List:", str(sys.argv))
+#print("Number of arguments:", len(sys.argv), "arguments")
+#print("Argument List:", str(sys.argv))
 # where the this file is present.
-current = os.path.dirname(os.path.realpath(__file__))
+#current = os.path.dirname(os.path.realpath(__file__))
 # Getting the parent directory name
 # where the current directory is present.
-parent = os.path.dirname(current)
-print("Parent directory: ", parent)
+#parent = os.path.dirname(current)
+#print("Parent directory: ", parent)
 # adding the parent directory to
 # the sys.path.
-sys.path.append(parent)
+# sys.path.append(parent)
+#sys.path.append("..")
 
 import imageio
 import numpy as np
 import torch
 from torch import nn
-from DL_model.config import TrainingConfig, config
+from config import TrainingConfig, config
 
-from DL_model.utils.training_inference_tools import get_final_preds
-from DL_model.utils.training_script_utils import init_model
-from DL_model.utils.visualization_tools import (
+from utils.training_inference_tools import get_final_preds
+from utils.training_script_utils import init_model
+from utils.visualization_tools import (
     get_annotations_contour,
     get_discrete_cmap,
     get_labels_cmap,
