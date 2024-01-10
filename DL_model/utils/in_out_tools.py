@@ -16,7 +16,7 @@ import numpy as np
 
 # from data.data_processing_tools import process_spark_prediction
 # from evaluation.metrics_tools import correspondences_precision_recall
-from DL_model.utils.visualization_tools import (  # add_colored_paired_sparks_to_video,
+from utils.visualization_tools import (  # add_colored_paired_sparks_to_video,
     add_colored_classes_to_video,
     add_colored_instances_to_video,
 )

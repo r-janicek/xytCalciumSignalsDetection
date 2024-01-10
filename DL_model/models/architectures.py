@@ -12,9 +12,9 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from DL_model.config import TrainingConfig
-from DL_model.models import UNet as unet
-from DL_model.models.UNet.unet.network import crop_and_merge
+from config import TrainingConfig
+from models import UNet as unet
+from models.UNet.unet.network import crop_and_merge
 
 ### temporal reducion unet ###
 

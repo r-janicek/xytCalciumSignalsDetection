@@ -17,6 +17,7 @@ from typing import Dict, List, Tuple, Union
 import cc3d
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 from scipy import ndimage as ndi
 from scipy import signal, spatial
 from scipy.ndimage import (
@@ -32,7 +33,7 @@ from skimage.measure import label, regionprops
 from skimage.morphology import binary_closing, disk
 from skimage.segmentation import watershed
 
-from DL_model.config import config
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -611,8 +612,7 @@ def get_separated_events(
             smooth_xs = smooth_xs.astype(float)
 
             # Compute watershed separation
-            markers = label(mask_loc)[0]
-
+            markers = label(mask_loc)
             split_event_mask = watershed(
                 image=-smooth_xs,
                 markers=markers,
@@ -921,10 +921,54 @@ def remove_small_events(
     return clean_instances_dict
 
 
+from scipy.ndimage import binary_fill_holes
+
+
+def fill_instances_holes(
+    instances_dict: Dict[str, np.ndarray]
+) -> Dict[str, np.ndarray]:
+    clean_instances_dict = {}
+
+    # Get binary mask of present events
+    binary_instances = np.sum(
+        [event_mask for event_mask in instances_dict.values()], axis=0
+    ).astype(bool)
+
+    for event_type in instances_dict.keys():
+        clean_instances_mask = np.copy(instances_dict[event_type])
+
+        if event_type not in config.event_types:
+            clean_instances_dict[event_type] = clean_instances_mask
+            continue
+
+        # Fill holes in each event instance
+        for frame in range(clean_instances_mask.shape[0]):
+            event_ids = np.unique(clean_instances_mask[frame])
+            event_ids = event_ids[event_ids != 0]
+
+            for event_id in event_ids:
+                instance_mask = (clean_instances_mask[frame] == event_id).astype(
+                    np.uint8
+                )
+                filled_mask = np.array(binary_fill_holes(instance_mask))
+                filled_mask = np.logical_and(filled_mask, ~binary_instances[frame])
+                if filled_mask.any():
+                    clean_instances_mask[frame] = np.where(
+                        filled_mask,
+                        event_id,
+                        clean_instances_mask[frame],
+                    )
+
+        clean_instances_dict[event_type] = clean_instances_mask
+
+    return clean_instances_dict
+
+
 def process_raw_predictions(
     raw_preds_dict: Dict[str, np.ndarray],
     input_movie: np.ndarray,
     training_mode: bool = False,
+    fill_holes: bool = False,
     debug: bool = False,
 ) -> Tuple[
     Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, List[Tuple[int, int, int]]]
@@ -936,6 +980,8 @@ def process_raw_predictions(
     - raw_preds_dict (dict): Raw UNet outputs for each class.
     - input_movie (numpy.ndarray): Original input movie.
     - training_mode (bool): If True, separate events using a simpler algorithm.
+    - fill_holes (bool): Whether to fill holes in the predicted segmentation
+        mask, so that each event is a connected component in each frame.
     - debug (bool): If True, print debugging information.
 
     Returns:
@@ -967,6 +1013,10 @@ def process_raw_predictions(
     preds_instances_dict = remove_small_events(
         instances_dict=preds_instances_dict, new_id=0
     )
+
+    if fill_holes:
+        # Fill holes in the segmented predictions
+        preds_instances_dict = fill_instances_holes(instances_dict=preds_instances_dict)
 
     for event_type in preds_instances_dict.keys():
         # Update segmented predicted masks accordingly

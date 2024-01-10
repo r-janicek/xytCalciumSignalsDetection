@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from DL_model.config import config
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,24 @@ def get_metrics_from_summary(
         metrics[event_type + "/recall"] = recall
         metrics[event_type + "/correctly_classified"] = correctly_classified
         metrics[event_type + "/detected"] = detected
+
+    # Also compute metrics with respect to all events
+    denom_preds = sum(tot_preds.values()) - sum(ignored_preds.values())
+    denom_ys = sum(tot_ys.values())
+
+    precision = sum(tp_preds.values()) / denom_preds if denom_preds > 0 else 0
+    recall = sum(tp_ys.values()) / denom_ys if denom_ys > 0 else 0
+    correctly_classified = (
+        sum(tp_preds.values()) / (denom_preds - sum(unlabeled_preds.values()))
+        if denom_preds > 0
+        else 0
+    )
+    detected = 1 - (sum(undetected_ys.values()) / denom_ys) if denom_ys > 0 else 0
+
+    metrics["total/precision"] = precision
+    metrics["total/recall"] = recall
+    metrics["total/correctly_classified"] = correctly_classified
+    metrics["total/detected"] = detected
 
     # Compute average over classes for each metric
     for m in ["precision", "recall", "correctly_classified", "detected"]:
@@ -434,8 +452,8 @@ def get_matches_summary(
 
     for ca_class in ca_classes:
         # Initialize sets of correctly matched annotations and predictions
-        matched_preds_ids[ca_class]["tp"] = set()
-        matched_ys_ids[ca_class]["tp"] = set()
+        matched_preds_ids[ca_class][ca_class] = set()
+        matched_ys_ids[ca_class][ca_class] = set()
 
         # Initialize ignored predicted events
         matched_preds_ids[ca_class]["ignored"] = set()
@@ -477,8 +495,8 @@ def get_matches_summary(
                     if matched_other_class:
                         if other_class == ca_class:
                             # pred_id is a correct prediction
-                            matched_preds_ids[ca_class]["tp"].add(pred_id)
-                            matched_ys_ids[ca_class]["tp"] |= matched_other_class
+                            matched_preds_ids[ca_class][ca_class].add(pred_id)
+                            matched_ys_ids[ca_class][ca_class] |= matched_other_class
                         else:
                             # pred_id is misclassified
                             matched_preds_ids[ca_class][other_class].add(pred_id)
@@ -521,11 +539,6 @@ def get_df_summary_events(
     df_ids = pd.DataFrame(matched_ids[inference_type]["sum"])
     df_percent = pd.DataFrame(matched_percent[inference_type])
 
-    # Assign 'tp' values to their respective event types
-    for event_type in config.event_types:
-        df_ids.at[event_type, event_type] = df_ids.at["tp", event_type]
-        df_percent.at[event_type, event_type] = df_percent.at["tp", event_type]
-
     # Rename columns with '%' for percentages
     df_percent = df_percent.rename(
         columns={event_type: f"% {event_type}" for event_type in config.event_types}
@@ -533,9 +546,6 @@ def get_df_summary_events(
 
     # Combine DataFrames
     df = pd.concat([df_ids, df_percent], axis=1)
-
-    # Drop 'tp' row
-    df = df.drop("tp")
 
     # Define a dictionary for renaming index labels
     index_labels = {

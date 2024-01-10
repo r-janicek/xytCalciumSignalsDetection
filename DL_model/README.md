@@ -56,4 +56,7 @@ Before using this code, make sure you have all the necessary libraries and depen
 
 For training a model, use **run_training.py** with a configuration file. For inference with a saved model, use **run_inference.py**.
 
+- `config.py` is the file where all the important parameters of the considered dataset have to be specified
+- `config_files/[...].ini` are the files specific to each training (so with different hyperparameters, loss function, number of training epochs, etc.) --> this file has to be either specified when running the training from the terminal (using `run_training.py`, example: ...TODO... ), or hardcoded in the interactive notebook `training (interactive).ipynb` (at line ...TODO...).
+
 
