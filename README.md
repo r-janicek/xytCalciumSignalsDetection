@@ -9,7 +9,7 @@
 
 </div>
 
-## **xytCalciumSignalsDetection**: Graphical User Interface for Calcium Event Detection 🖥️💡
+## **xytCalciumSignalsDetection**:  Graphical User Interface for Calcium Event Detection 🖥️💡
 
 This repository contains a graphical user interface (GUI) that uses deep learning to detect calcium events in xyt fluorescence image series. Using a deep learning model based on the 3D U-Net architecture [[1]](#1), the GUI makes it easy for researchers to identify and retrieve parameters such as amplitude, FDHM, ... of local calcium release signals, which are crucial for understanding cellular functions or neuronal activity in physiological research.
 
@@ -89,10 +89,6 @@ To use the GUI for calcium signal analysis, follow these steps:
 
 For any queries, please reach out to us at [GitHub Issues](https://github.com/r-janicek/xytCalciumSignalsDetection/issues).
 
-## License
+## License 
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-[Back to Top](#table-of-contents) 🚀
+... (TODO)
