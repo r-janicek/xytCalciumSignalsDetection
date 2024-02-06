@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from DL_model.utils.LovaszSoftmax import lovasz_losses
+from utils.LovaszSoftmax import lovasz_losses
 
 __all__ = [
     "FocalLoss",

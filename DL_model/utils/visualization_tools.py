@@ -18,7 +18,7 @@ from matplotlib import cm
 from PIL import Image
 from scipy import ndimage as ndi
 
-from DL_model.config import config
+from config import config
 
 # NOTES FOR THE FUTURE:
 # How to create a DataFrame with various parameters

@@ -14,31 +14,31 @@ from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.utils.data
-import wandb
 from scipy import ndimage as ndi
 from sklearn.metrics import confusion_matrix
 from torch import nn
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader
 
-from DL_model.config import TrainingConfig, config
-from DL_model.data.data_processing_tools import (
+import wandb
+from config import TrainingConfig, config
+from data.data_processing_tools import (
     masks_to_instances_dict,
     preds_dict_to_mask,
     process_raw_predictions,
     remove_padding,
 )
-from DL_model.data.datasets import SparkDataset, SparkDatasetInference
-from DL_model.evaluation.metrics_tools import (
+from data.datasets import SparkDataset, SparkDatasetInference
+from evaluation.metrics_tools import (
     compute_iou,
     get_matches_summary,
     get_metrics_from_summary,
     get_score_matrix,
 )
-from DL_model.models.UNet import unet
-from DL_model.models.UNet.unet.trainer import _write_results
-from DL_model.utils.custom_losses import MySoftDiceLoss
-from DL_model.utils.in_out_tools import write_videos_on_disk
+from models.UNet import unet
+from models.UNet.unet.trainer import _write_results
+from utils.custom_losses import MySoftDiceLoss
+from utils.in_out_tools import write_videos_on_disk
 
 __all__ = [
     "MyTrainingManager",  # training
@@ -795,6 +795,7 @@ def max_inference(frame_preds: List[List[torch.Tensor]]) -> torch.Tensor:
 def get_final_preds(
     model: nn.Module,
     params: TrainingConfig,
+    fill_holes: bool = False,
     **kwargs,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -807,6 +808,8 @@ def get_final_preds(
     Args:
     - model (torch.nn.Module): The trained neural network model.
     - params (TrainingConfig): A TrainingConfig containing various parameters.
+    - fill_holes (bool): Whether to fill holes in the predicted segmentation
+        mask, so that each event is a connected component in each frame.
 
     Kwargs:
     - movie (np.ndarray): The movie to be processed.
@@ -817,7 +820,6 @@ def get_final_preds(
         - preds_segmentation: Predicted segmentation.
         - preds_instances: Predicted event instances.
     """
-
     ### Get sample as dataset ###
     sample_dataset = SparkDatasetInference(
         params=params,
@@ -854,6 +856,7 @@ def get_final_preds(
         raw_preds_dict=raw_pred_dict,
         input_movie=input_movie,
         training_mode=False,
+        fill_holes=fill_holes,
         debug=False,
     )
 
@@ -1055,12 +1058,12 @@ def test_function(
         # Count number of categorized events that are necessary for the metrics
         for ca_event in config.event_types:
             tot_preds[ca_event] += len(matched_preds_ids[ca_event]["tot"])
-            tp_preds[ca_event] += len(matched_preds_ids[ca_event]["tp"])
+            tp_preds[ca_event] += len(matched_preds_ids[ca_event][ca_event])
             ignored_preds[ca_event] += len(matched_preds_ids[ca_event]["ignored"])
             unlabeled_preds[ca_event] += len(matched_preds_ids[ca_event]["unlabeled"])
 
             tot_ys[ca_event] += len(matched_ys_ids[ca_event]["tot"])
-            tp_ys[ca_event] += len(matched_ys_ids[ca_event]["tp"])
+            tp_ys[ca_event] += len(matched_ys_ids[ca_event][ca_event])
             undetected_ys[ca_event] += len(matched_ys_ids[ca_event]["undetected"])
 
         logger.debug(f"Time to get matches summary: {time.time() - start:.2f} s")

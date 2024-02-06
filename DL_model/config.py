@@ -16,11 +16,13 @@ import logging
 import math
 import os
 import sys
+import warnings
 from configparser import ConfigParser
 from logging.handlers import RotatingFileHandler
 
 import numpy as np
 import torch
+
 import wandb
 
 __all__ = ["config", "TrainingConfig"]
@@ -33,6 +35,10 @@ class ProjectConfig:
         """
         Initialize the configuration object.
         The configuration object stores all the global variables for the project.
+
+        Comment for Matlab GUI: to change the values of the attributes, you can
+        access them using dot notation, e.g.
+        config.min_size["sparks"] = [1, 2, 3].
         """
         # Get basedir of the project
         self.basedir = os.path.dirname(os.path.realpath(__file__))
@@ -47,10 +53,7 @@ class ProjectConfig:
         # wandb_project_name = "TEST"
         self.wandb_project_name = "sparks2"
         # Directory where output, saved parameters, and testing results are saved
-        self.output_relative_dir = os.path.join("models", "saved_models")
-        self.output_dir = os.path.realpath(
-            os.path.join(self.basedir, self.output_relative_dir)
-        )
+        self._output_relative_dir = os.path.join("models", "saved_models")
 
         ### Dataset parameters ###
 
@@ -63,12 +66,13 @@ class ProjectConfig:
             "sparks": 1,
             "waves": 2,
             "puffs": 3,
+            # "transient": 4,
+            # "undefined": 5,  type of local signal (not spark of puff)
         }
         # note: the class values have to be consecutive
         self.event_types = ["sparks", "waves", "puffs"]
 
-        self.num_classes = len(self.classes_dict)
-        self.ignore_index = self.num_classes  # Label ignored during training
+        self.ignore_index = 4  # Label ignored during training
 
         # Include ingore index in the classes dictionary
         self.classes_dict["ignore"] = self.ignore_index
@@ -85,12 +89,8 @@ class ProjectConfig:
         ## Sparks (1) parameters ##
 
         # To get sparks locations
-        # Minimum XY distance between spark peaks.
-        self.min_dist_xy = round(1.8 / self.pixel_size)
-        # Minimum T (time) distance between spark peaks.
-        self.min_dist_t = round(20 / self.time_frame)
         # Connectivity mask of sparks
-        self.set_sparks_connectivity_mask()
+        self._set_sparks_connectivity_mask()
         # Sigma value used for sample smoothing in sparks peaks detection
         self.sparks_sigma = 3
         # Sigma values used for sample smoothing in sparks peaks detection in
@@ -119,7 +119,7 @@ class ProjectConfig:
         # (threshold for considering annotated and pred ROIs a match)
         self.iomin_t = 0.5
 
-    def set_sparks_connectivity_mask(self):
+    def _set_sparks_connectivity_mask(self):
         """
         Create a mask defining the minimum distance between two spark peaks.
 
@@ -129,9 +129,29 @@ class ProjectConfig:
         radius_xy = math.ceil(self.min_dist_xy / 2)
         y, x = np.ogrid[-radius_xy : radius_xy + 1, -radius_xy : radius_xy + 1]
         disk_xy = x**2 + y**2 <= radius_xy**2
-        connectivity_mask = np.stack([disk_xy] * self.min_dist_t, axis=0)
+        self._conn_mask = np.stack([disk_xy] * self.min_dist_t, axis=0)
 
-        self.conn_mask = connectivity_mask
+    @property
+    def conn_mask(self):
+        return self._conn_mask
+
+    @property
+    def min_dist_xy(self):
+        # Minimum XY distance between spark peaks (to get sparks locations).
+        return round(1.8 / self.pixel_size)
+
+    @property
+    def min_dist_t(self):
+        # Minimum T (time) distance between spark peaks (to get sparks locations).
+        return round(20 / self.time_frame)
+
+    @property
+    def num_classes(self):
+        return len(self.event_types) + 1  # +1 for background
+
+    @property
+    def output_dir(self):
+        return os.path.realpath(os.path.join(self.basedir, self._output_relative_dir))
 
 
 # Initialize the configuration object
@@ -364,10 +384,10 @@ class TrainingConfig:
         self.dataset_dir = os.path.realpath(
             os.path.join(config.basedir, self.dataset_dir)
         )
-        assert os.path.isdir(
-            self.dataset_dir
-        ), f'"{self.dataset_dir}" is not a directory'
-
+        if not os.path.isdir(self.dataset_dir):
+            warnings.warn(
+                f'Specified dataset path "{self.dataset_dir}" is not a directory, only inference with a provided movie path or an array is possible.'
+            )
         self.dataset_size = dataset_section.get("dataset_size", "full")
         self.batch_size = int(dataset_section.get("batch_size", "4"))
         # self.num_workers = dataset_section.getint("num_workers", 1)
